@@ -352,7 +352,7 @@ int main(void)
 
 	  //comment out the transmition to figure out how to recieve
 
-	  /*
+
 	  uint8_t TxData1[16]; //the array that we use to send CAN
 	  int byte_index = 0;
 
@@ -416,7 +416,7 @@ int main(void)
 
 	 count++;
 	 printf("count: %d \r\n",count);
-	*/
+
 
   }
   /* USER CODE END 3 */
