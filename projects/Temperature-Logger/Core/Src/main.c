@@ -39,6 +39,7 @@ typedef struct {
 } ADC_Channel_Info ;
 
 
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -183,6 +184,8 @@ void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t Bu
     printf("Tx buffer complete. BufferIndexes: 0x%lX\r\n", BufferIndexes);
 }
 
+
+
 /* USER CODE END 0 */
 
 /**
@@ -193,6 +196,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+
 
   /* USER CODE END 1 */
 
@@ -224,13 +228,71 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC4_Init();
   MX_FDCAN1_Init();
+
+	 if (HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_ACCEPT_IN_RX_FIFO0, FDCAN_FILTER_REMOTE, FDCAN_FILTER_REMOTE) != HAL_OK)
+	  {
+	     printf("filter not getting HAL OK\r\n");
+	     printf("HAL ERROR CODE: %lu\r\n", HAL_FDCAN_GetError(&hfdcan1));
+	     Error_Handler();
+	  }
+
   /* USER CODE BEGIN 2 */
 	CAN_Init(&hfdcan1);
-	//CAN_SetRxBufferSize(64,64);
-	CAN_SetRxBufferSize(64, 64);
+
+	//Adding CAN Filter
+	FDCAN_FilterTypeDef sFilterConfig = {0};
+	sFilterConfig.IdType = FDCAN_STANDARD_ID;
+	sFilterConfig.FilterIndex = 0;
+	sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+
+	sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+	sFilterConfig.FilterID1 = 0x000;
+	sFilterConfig.FilterID2 = 0x000; // Accept all
+
+	if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK) {
+	    Error_Handler();
+	}
+
+
+	sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO1;
+	sFilterConfig.FilterID1 = 0x1111111;
+	sFilterConfig.FilterID2 = 0x2222222;
+
+
+	//FilterConfig.FilterID2 = 0x7FF; ????
+
+
+	  /* Configure global filter:
+	     Filter all remote frames with STD and EXT ID
+	     Reject non matching frames with STD ID and EXT ID */
+
+
+	//set an interrupt when a message is sent
+	  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+
+	  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO1_NEW_MESSAGE, 0) != HAL_OK)
+	  {
+	    Error_Handler();
+	  }
+
+
+
+
+
+
+
+    //this has to be set to 64
+	CAN_SetRxBufferSize(64,64);
 	HAL_FDCAN_Start(&hfdcan1);
 
 	int count = 0;
+
+
+
+
 
 	/* Transmitting board, comment out on receving board */
 
@@ -284,8 +346,13 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  HAL_Delay(10);//5 SECONDS AS OF NOW
 
+
+	  HAL_Delay(5000);//0.5 SECONDS AS OF NOW
+
+	  //comment out the transmition to figure out how to recieve
+
+	  /*
 	  uint8_t TxData1[16]; //the array that we use to send CAN
 	  int byte_index = 0;
 
@@ -299,6 +366,9 @@ int main(void)
 		    	 encoded_val = (int16_t)(adc * 100);  //to get rid of the decimal places (this gives us 4 hex digits)
 		        if (adc >= temp_threshold ) {
 		            printf("%s temperature too high! %.2f°C CANT: %d CANT: %X \r\n", info.label, adc ,encoded_val , encoded_val);
+		            // toggle pin PC_8 it shuts off the entire system
+		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 is the boot pin
+
 		        } else {
 		            printf("%s: %.2f°C CANT: %d \r\n", info.label, adc , encoded_val );
 		        }
@@ -306,8 +376,11 @@ int main(void)
 		    	 encoded_val = (int16_t)(adc*10000*5);  // multiplying the value by 10000 to get 4 hex digits its cleaner
 		        if (adc*5 <= voltage_threshold ) {
 		            printf("%s below the recommended range! %.2f CANV: %d CANV: %X \r\n", info.label , 5*adc, encoded_val, encoded_val);
+		            // toggle pin PC_8 it shuts off the entire system
+		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 is the boot pin
+
 		        } else {
-		            printf("%s: %.2fV CANV: %d CANV: %X\r\n ", info.label, 5*adc ,encoded_val, encoded_val);
+		            printf("%s: %.2fV CANV: %d CANV: %X\r\n", info.label, 5*adc ,encoded_val, encoded_val);
 		        }
 		    }
 
@@ -317,7 +390,8 @@ int main(void)
 	  }
 
 
-	      // in the loop we are parsing through our values and then we are adding two garbage values at the end
+	      // in the loop we are parsing through our values and then we are adding two garbage values at the end because we only have
+	       //14 bytes of value that we actually need to send
 	  	  TxData1[byte_index++] = 0x00; //fill in the end of the array with garbage
 	  	  TxData1[byte_index++] = 0x00;
 
@@ -342,9 +416,7 @@ int main(void)
 
 	 count++;
 	 printf("count: %d \r\n",count);
-
-
-
+	*/
 
   }
   /* USER CODE END 3 */
@@ -469,6 +541,8 @@ static void MX_ADC1_Init(void)
   {
     Error_Handler();
   }
+
+
 
   /** Configure Regular Channel
   */

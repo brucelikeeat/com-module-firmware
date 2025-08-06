@@ -15,6 +15,8 @@
 #include "main.h"
 #include <stdio.h>
 #include <string.h>
+#include "stm32u5xx_hal.h"
+
 
 /* Variables ------------------------------------------------------------------*/
 HAL_StatusTypeDef CanStartStatus; 	/* Status of FDCAN start operation */
@@ -25,6 +27,7 @@ uint16_t RxData2_BufferLength = 0; 	/* Length of data received in FIFO1 */
 uint32_t RxData1_Identifier;
 uint32_t RxData2_Identifier;
 
+//you have to say volatile because it is defined inside a interrupt context
 /* Functions ------------------------------------------------------------------*/
 
 /**
@@ -32,6 +35,7 @@ uint32_t RxData2_Identifier;
  * @param RxData1_Length: Length of buffer for FIFO0.
  * @param RxData2_Length: Length of buffer for FIFO1.
  */
+
 void CAN_SetRxBufferSize(uint16_t RxData1_Length, uint16_t RxData2_Length) {
     if (RxData1 != NULL) {
         free(RxData1);
@@ -188,43 +192,60 @@ uint8_t* CAN_Receive(void) {
  * @brief Callback function for handling messages received in FIFO0.
  * @param hfdcan: Pointer to FDCAN handle.
  * @param RxFifo0ITs: FIFO0 interrupt flags.
+ *
+ *
  */
-void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs) {
-    if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET) {
-        FDCAN_RxHeaderTypeDef RxHeader;
-        memset(RxData1, 0, 64);
-        if (RxData1 == NULL) {
-            Error_Handler();
-        }
-        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &RxHeader, RxData1) != HAL_OK) {
-            Error_Handler();
-            HAL_GPIO_WritePin(GPIOG, GPIO_PIN_2, GPIO_PIN_SET);
-        }
-        //check actual length incoming against the buf len rather than stringcmp?
-        RxData1_BufferLength = dlc_to_bytes(RxHeader.DataLength);
-        RxData1_Identifier = RxHeader.Identifier;
-    }
-    /* added for debug */
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
-}
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+    if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != RESET)
+    {
+        FDCAN_RxHeaderTypeDef rxHeader;
+        uint8_t rxData[64];  // Adjust based on your max expected DLC
 
-/**
- * @brief Callback function for handling messages received in FIFO1.
- * @param hfdcan: Pointer to FDCAN handle.
- * @param RxFifo1ITs: FIFO1 interrupt flags.
- */
-void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs) {
-    if ((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) != RESET) {
-        FDCAN_RxHeaderTypeDef RxHeader;
-        memset(RxData2, 0, 64);
-        if (RxData2 == NULL) {
+        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rxHeader, rxData) != HAL_OK)
+        {
             Error_Handler();
         }
-        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &RxHeader, RxData2) != HAL_OK) {
-            Error_Handler();
+
+        //giving the highest priority to shutdown command
+        //ask about FIFO1 and if we should have a command there as well ?
+        if (rxHeader.Identifier == 0x202 ) {
+
+        	if (rxData[0] == 0x10) {
+
+        		printf("Shutdown command was received\r\n");
+        		//set PC_8 to low
+        		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 is the boot pin
+        		printf("PC_8 Pulled Low \r\n");
+        	}
+
+        	//restart after 15s
+        	else if (rxData[0] == 0x20) {
+
+        		printf("restart command was received\r\n");
+    	        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 is the boot pin
+    	        printf("PC_8 Pulled Low \r\n");
+    	        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+    	        printf("PC_8 Pulled High \r\n");
+    	        //i need to make the time between this 15s
+
+
+
+        	}
+
+
+        	 else {
+        	        printf("Unknown command: %d\r\n", rxData[0]);
+
+        	    }
+
         }
-        RxData2_BufferLength = dlc_to_bytes(RxHeader.DataLength);
-        RxData2_Identifier = RxHeader.Identifier;
+
+        printf("Rx FIFO0 ID: 0x%lX, Length: %lu\r\n", rxHeader.Identifier, dlc_to_bytes(rxHeader.DataLength));
+        for (uint8_t i = 0; i < dlc_to_bytes(rxHeader.DataLength); i++) {
+            printf("%02X ", rxData[i]);
+        }
+        printf("\r\n");
     }
 }
 
@@ -240,6 +261,29 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
  *
  * @retval 	None
  */
+
+void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
+{
+    if ((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) != RESET)
+    {
+        FDCAN_RxHeaderTypeDef rxHeader;
+        uint8_t rxData[64];
+
+        if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &rxHeader, rxData) != HAL_OK)
+        {
+            Error_Handler();
+        }
+
+
+        printf("Rx FIFO1 ID: 0x%lX, Length: %lu\r\n", rxHeader.Identifier, dlc_to_bytes(rxHeader.DataLength));
+        for (uint8_t i = 0; i < dlc_to_bytes(rxHeader.DataLength); i++) {
+            printf("%02X ", rxData[i]);
+        }
+        printf("\r\n");
+    }
+}
+
+
 void CAN_PrintRxData(void) {
     if (RxData1 != NULL && RxData1_BufferLength > 0) {
         printf("\r\nFIFO0 Received: \r\n");
@@ -261,6 +305,8 @@ void CAN_PrintRxData(void) {
         printf("FIFO1: No data received.\n");
     }
 }
+
+
 
 /* DLC to bytes lookup */
 uint8_t dlc_to_bytes(uint8_t dlc) {
