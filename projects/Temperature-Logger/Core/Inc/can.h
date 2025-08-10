@@ -23,6 +23,8 @@ extern uint8_t* RxData1; 			/* Pointer to receive buffer for FIFO0 (Standard ID)
 extern uint8_t* RxData2; 			/* Pointer to receive buffer for FIFO1 (Extended ID)*/
 extern uint16_t RxData1_Length; 	/* Length of data received in FIFO0 */
 extern uint16_t RxData2_Length; 	/* Length of data received in FIFO1 */
+extern volatile uint8_t restart_requested;
+
 
 /* Function prototypes ------------------------------------------------------------------*/
 void CAN_SetRxBufferSize(uint16_t RxData1_Length, uint16_t RxData2_Length);

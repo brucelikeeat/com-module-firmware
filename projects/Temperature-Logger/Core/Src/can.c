@@ -26,6 +26,7 @@ uint16_t RxData1_BufferLength = 0; 	/* Length of data received in FIFO0 */
 uint16_t RxData2_BufferLength = 0; 	/* Length of data received in FIFO1 */
 uint32_t RxData1_Identifier;
 uint32_t RxData2_Identifier;
+volatile uint8_t restart_requested = 0;
 
 //you have to say volatile because it is defined inside a interrupt context
 /* Functions ------------------------------------------------------------------*/
@@ -211,7 +212,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         //ask about FIFO1 and if we should have a command there as well ?
         if (rxHeader.Identifier == 0x202 ) {
 
-        	if (rxData[0] == 0x10) {
+        	if (rxData[0] == 0x0A) {
 
         		printf("Shutdown command was received\r\n");
         		//set PC_8 to low
@@ -220,13 +221,15 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
         	}
 
         	//restart after 15s
-        	else if (rxData[0] == 0x20) {
+        	else if (rxData[0] == 0x14) {
 
         		printf("restart command was received\r\n");
-    	        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 is the boot pin
-    	        printf("PC_8 Pulled Low \r\n");
-    	        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
-    	        printf("PC_8 Pulled High \r\n");
+        		restart_requested = 1;
+
+    	        //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 is the boot pin
+    	        //printf("PC_8 Pulled Low \r\n");
+    	        //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+    	       // printf("PC_8 Pulled High \r\n");
     	        //i need to make the time between this 15s
 
 
