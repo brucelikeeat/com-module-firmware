@@ -89,13 +89,13 @@ NTC_Config ntc_sensors[NUM_SENSORS] = {
 };
 
 ADC_Channel_Info channel_info[7] = {
-    {"VC2",0},
+    {"VC2_Cumulative",0},
     {"TempPack2",1},
-    {"VC3",0},
+    {"VC3_Cumulative",0},
     {"TempPack B/B",1},
     {"TempPack1",1},
-    {"VC4",0},
-    {"VC1",0},
+    {"VC4_Cumulative",0},
+    {"VC1_Cumulative",0},
 };
 
 /* USER CODE END PV */
@@ -165,7 +165,6 @@ static float ADC_Select_Channel(uint32_t channelNumber)
   HAL_ADC_Start(ntc_sensors[channelNumber - 1].hadc);
   HAL_ADC_PollForConversion(ntc_sensors[channelNumber - 1].hadc, 1000);
   raw = HAL_ADC_GetValue(ntc_sensors[channelNumber - 1].hadc);
-  printf("%d",raw);
   HAL_ADC_Stop(ntc_sensors[channelNumber - 1].hadc);
 
       float v = (raw / ADC_RESOLUTION) * VREF;
@@ -184,6 +183,7 @@ void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t Bu
 {
     printf("Tx buffer complete. BufferIndexes: 0x%lX\r\n", BufferIndexes);
 }
+
 
 
 
@@ -230,121 +230,104 @@ int main(void)
   MX_ADC4_Init();
   MX_FDCAN1_Init();
   /* USER CODE BEGIN 2 */
-	CAN_Init(&hfdcan1);
+  CAN_Init(&hfdcan1);
 
-	//Adding CAN Filter
-	FDCAN_FilterTypeDef sFilterConfig = {0};
-	sFilterConfig.IdType = FDCAN_STANDARD_ID;
-	sFilterConfig.FilterIndex = 0;
-	sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+  	//Adding CAN Filter
+  	FDCAN_FilterTypeDef sFilterConfig = {0};
+  	sFilterConfig.IdType = FDCAN_STANDARD_ID;
+  	sFilterConfig.FilterIndex = 0;
+  	sFilterConfig.FilterType = FDCAN_FILTER_MASK;
 
-	sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-	sFilterConfig.FilterID1 = 0x000;
-	sFilterConfig.FilterID2 = 0x000; // Accept all
+  	sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  	sFilterConfig.FilterID1 = 0x000;
+  	sFilterConfig.FilterID2 = 0x000; // Accept all
 
-	if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK) {
-	    Error_Handler();
-	}
-
-
-	sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO1;
-	sFilterConfig.FilterID1 = 0x1111111;
-	sFilterConfig.FilterID2 = 0x2222222;
+  	if (HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig) != HAL_OK) {
+  	    Error_Handler();
+  	}
 
 
-	//FilterConfig.FilterID2 = 0x7FF; ????
+  	sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO1;
+  	sFilterConfig.FilterID1 = 0x1111111;
+  	sFilterConfig.FilterID2 = 0x2222222;
 
 
-	  /* Configure global filter:
-	     Filter all remote frames with STD and EXT ID
-	     Reject non matching frames with STD ID and EXT ID */
+  	//FilterConfig.FilterID2 = 0x7FF; ????
 
 
-	//set an interrupt when a message is sent
-	  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
-	  {
-	    Error_Handler();
-	  }
-
-	  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO1_NEW_MESSAGE, 0) != HAL_OK)
-	  {
-	    Error_Handler();
-	  }
+  	  /* Configure global filter:
+  	     Filter all remote frames with STD and EXT ID
+  	     Reject non matching frames with STD ID and EXT ID */
 
 
+  	//set an interrupt when a message is sent
+  	  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+  	  {
+  	    Error_Handler();
+  	  }
+
+  	  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO1_NEW_MESSAGE, 0) != HAL_OK)
+  	  {
+  	    Error_Handler();
+  	  }
 
 
 
 
 
-    //this has to be set to 64
-	CAN_SetRxBufferSize(64,64);
-	HAL_FDCAN_Start(&hfdcan1);
-
-	int count = 0;
 
 
+      //this has to be set to 64
+  	CAN_SetRxBufferSize(64,64);
+  	HAL_FDCAN_Start(&hfdcan1);
+
+  	int count = 0;
+
+  	float adc_readings[7] = {0}; //store all adc readings here
+  	float vc[4] = {0};
+  	int vc_index=0 ;
+  	uint16_t individual_voltages[4] = {0};
 
 
 
-	/* Transmitting board, comment out on receving board */
 
 
-//  HAL_Delay(1000);
-//
-//  ADC_ChannelConfTypeDef sConfig = {0};
-//  sConfig.Channel = ADC_CHANNEL_VREFINT;
-//  sConfig.Rank = ADC_REGULAR_RANK_1;
-//  sConfig.SamplingTime = ADC_SAMPLETIME_5CYCLE;
-//  HAL_ADC_ConfigChannel(&hadc1, &sConfig);
-//
-//  HAL_ADC_Start(&hadc1);
-//  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-//  uint32_t raw = HAL_ADC_GetValue(&hadc1);
-//  HAL_ADC_Stop(&hadc1);
-//
-//  float vref_measured = 1.21 * 4095.0f / raw;
-//  printf("ADC thinks VREF is: %.2fV\r\n", vref_measured);
+
+  	/* Transmitting board, comment out on receving board */
+
+
+  //  HAL_Delay(1000);
+  //
+  //  ADC_ChannelConfTypeDef sConfig = {0};
+  //  sConfig.Channel = ADC_CHANNEL_VREFINT;
+  //  sConfig.Rank = ADC_REGULAR_RANK_1;
+  //  sConfig.SamplingTime = ADC_SAMPLETIME_5CYCLE;
+  //  HAL_ADC_ConfigChannel(&hadc1, &sConfig);
+  //
+  //  HAL_ADC_Start(&hadc1);
+  //  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+  //  uint32_t raw = HAL_ADC_GetValue(&hadc1);
+  //  HAL_ADC_Stop(&hadc1);
+  //
+  //  float vref_measured = 1.21 * 4095.0f / raw;
+  //  printf("ADC thinks VREF is: %.2fV\r\n", vref_measured);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  	 // HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
-
-//      ADC_ChannelConfTypeDef sConfig = {0};
-//      sConfig.Channel = ADC_CHANNEL_VREFINT;
-//      sConfig.Rank = ADC_REGULAR_RANK_1;
-//sConfig.SamplingTime = ADC_SAMPLETIME_5CYCLE;
-//      HAL_ADC_ConfigChannel(&hadc1, &sConfig);
-
-//	  if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) != HAL_OK)
-//	  {
-//		Error_Handler();
-//	  }
-//
-//  	  HAL_Delay(1000);
-
-
-
-
-//      ADC_ChannelConfTypeDef ssConfig = {0};
-//      ssConfig.Channel = ADC_CHANNEL_5;
-//      ssConfig.Rank = ADC_REGULAR_RANK_1;
-//      //sConfig.SamplingTime = ADC_SAMPLETIME_5CYCLE;
-//      HAL_ADC_ConfigChannel(&hadc1, &ssConfig);
-
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
+	  vc_index = 0; // reset the value of the index
 
 
 	  HAL_Delay(100);//0.1 SECONDS AS OF NOW
 
 	  if (restart_requested) {
-		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); //turn pin off (inverted logic)
 		  printf("PC_8 Pulled Low\r\n");
 	      for (int sec = 20; sec > 0; sec--) {
 	          printf("Restarting in %d seconds...\r\n", sec);
@@ -353,7 +336,7 @@ int main(void)
 
 
 
-	      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+	      HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //turn pin back on (inverted logic)
 	      printf("PC_8 Pulled High\r\n");
 
 	      restart_requested = 0;
@@ -369,6 +352,7 @@ int main(void)
 	  for(int i = 1; i <= 7; i++){
 		  float adc = ADC_Select_Channel(i);
 		  ADC_Channel_Info info = channel_info[i-1];
+		  adc_readings[i-1] = adc; //store the adc value
 
 		  int16_t encoded_val;  // Declare here so it's accessible below
 
@@ -377,7 +361,7 @@ int main(void)
 		        if (adc >= temp_threshold ) {
 		            printf("%s temperature too high! %.2f°C CANT: %d CANT: %X \r\n", info.label, adc ,encoded_val , encoded_val);
 		            // toggle pin PC_8 it shuts off the entire system
-		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 is the boot pin
+		           // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); //PC_8 is the boot pin
 
 		        } else {
 		            printf("%s: %.2f°C CANT: %d \r\n", info.label, adc , encoded_val );
@@ -387,30 +371,66 @@ int main(void)
 		        if (adc*5 <= voltage_threshold ) {
 		            printf("%s below the recommended range! %.2f CANV: %d CANV: %X \r\n", info.label , 5*adc, encoded_val, encoded_val);
 		            // toggle pin PC_8 it shuts off the entire system
-		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 is the boot pin
+		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); //PC_8 is the boot pin
 
 		        } else {
 		            printf("%s: %.2fV CANV: %d CANV: %X\r\n", info.label, 5*adc ,encoded_val, encoded_val);
 		        }
 		    }
 
-		    // Split into two bytes (big-endian: high first)
-		    TxData1[byte_index++] = encoded_val & 0xFF;         // LOW byte
-		    TxData1[byte_index++] = (encoded_val >> 8) & 0xFF;  // HIGH byte
-	  }
+		    // Build vc[] array only for your voltage channels (1,3,6,7)
+		           if ((i == 1) || (i == 3) || (i == 6) || (i == 7)) {
+		               vc[vc_index++] = adc * 5;
+		           }
+
+		           // When you reach the last channel, compute individual voltages and print
+		           if (i == 7) {
+		               for (int j = 0; j < 4; j++) {
+		                   printf("%.2f ", vc[j]);
+		               }
+		               printf("\r\n");
+
+		               individual_voltages[0] = (vc[0] - vc[3]) * 1000;
+		               individual_voltages[1] = (vc[1] - vc[0]) * 1000;
+		               individual_voltages[2] = (vc[2] - vc[1]) * 1000;
+		               individual_voltages[3] = (vc[3]) * 1000;
+
+		               for (int k = 0; k < 4; k++) {
+		                   printf("%d ", individual_voltages[k]);
+		               }
+		               printf("\r\n");
+		           }
+		       }
+
+		       // Now build your TxData1 using temp_values and individual_voltages correctly
 
 
-	      // in the loop we are parsing through our values and then we are adding two garbage values at the end because we only have
-	       //14 bytes of value that we actually need to send
-	  	  TxData1[byte_index++] = 0x00; //fill in the end of the array with garbage
-	  	  TxData1[byte_index++] = 0x00;
+		       int volt_index = 0;
 
+		       for (int i = 1; i <= 7; i++) {
+		           int16_t encoded_val;
 
-		  printf("\nTxData1 Array:\r\n");
-		  for (int i = 0; i < 16; i++) {
-			  printf("%X ", TxData1[i]);  // Print each byte in hex
-		  }
-		  printf("\r\n");
+		           if (channel_info[i-1].is_temp) {
+		               encoded_val = (int16_t)(adc_readings[i-1] * 100);
+		           } else {
+		               encoded_val = individual_voltages[volt_index++];
+		           }
+
+		           // Pack the encoded_val into TxData1 (low byte first)
+		           TxData1[byte_index++] = encoded_val & 0xFF;
+		           TxData1[byte_index++] = (encoded_val >> 8) & 0xFF;
+		       }
+
+		       // Add two extra zero bytes
+		       TxData1[byte_index++] = 0x00;
+		       TxData1[byte_index++] = 0x00;
+
+		       // Print TxData1 array exactly as you had it
+		       printf("\nTxData1 Array:\r\n");
+		       for (int i = 0; i < 16; i++) {
+		           printf("%X ", TxData1[i]);
+		       }
+		       printf("\r\n");
 
 
 		  ///CAN_Transmit(uint32_t Identifier, uint32_t IdType, uint32_t DataLength, uint8_t* DataBuffer, FDCAN_HandleTypeDef *hfdcan1);
@@ -421,7 +441,7 @@ int main(void)
 		 printf("HAL ERROR CODE: %lu\r\n", HAL_FDCAN_GetError(&hfdcan1));
 		 printf("TS: %lu\r\n", HAL_GetTick());
 		 printf("count: %d \r\n",count);
-		 Error_Handler();
+		 //Error_Handler();
 	 	 }
 
 	 count++;
@@ -836,7 +856,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, LED_GREEN_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, UCPD_DBn_Pin|LED_BLUE_Pin, GPIO_PIN_RESET);
@@ -866,6 +886,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(LED_GREEN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PC8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : UCPD_DBn_Pin */
   GPIO_InitStruct.Pin = UCPD_DBn_Pin;

@@ -216,7 +216,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 
         		printf("Shutdown command was received\r\n");
         		//set PC_8 to low
-        		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 is the boot pin
+        		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); //PC_8 is the boot pin (inverted logic)
         		printf("PC_8 Pulled Low \r\n");
         	}
 
