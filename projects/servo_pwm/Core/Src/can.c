@@ -235,7 +235,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
                 trim_tab_angle = ((recieved_msg)/1000.0) - 90 ; //set trim tab angle to this
 
                 //angle should be centered at 90 plus/minus 80 and some mechanical offset that is TBD
-                if ((10 + mechanical_offset <= trim_tab_angle) && (trim_tab_angle <= 170 + mechanical_offset)) {
+                if ((-90 + mechanical_offset <= trim_tab_angle) && (trim_tab_angle <= 90 + mechanical_offset)) {
 
 					printf("set the trim tab angle to %f \r\n" , trim_tab_angle);
 					angle = trim_tab_angle; //send it back to main

@@ -127,6 +127,8 @@ int main(void)
 
   CAN_Init(&hfdcan1);
 
+  	 //.
+
    	//Adding CAN Filter
    	FDCAN_FilterTypeDef sFilterConfig = {0};
    	sFilterConfig.IdType = FDCAN_STANDARD_ID;
@@ -201,7 +203,10 @@ int main(void)
 	  min_pulse = 1000; // ticks for 1 ms
 	  max_pulse = 2000; // ticks for 2 ms
 
-	  pulse = min_pulse + ( angle / 180.0f ) * (max_pulse - min_pulse);
+	  //-90 would be mapped to min_pulse 1000
+	  // +90 would be mapped to max pulse 2000
+	  //0 sits at the middle
+	  pulse = min_pulse + ((angle+ 90) / 180.0f ) * (max_pulse - min_pulse);
 	  ccr_value = (uint32_t)(pulse);
 
 	  printf("the pwm pulse is %lu \r\n", ccr_value);
