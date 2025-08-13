@@ -187,7 +187,6 @@ int main(void)
   float pulse = 0 ;
   uint32_t ccr_value =0 ;
 
-
   while (1)
   {
 
@@ -200,13 +199,13 @@ int main(void)
 	  //The servo reads only the length of the HIGH pulse at the start of each cycle, which varies to set position.
 	  //that is why we go between 1 and 2 ms;
 
-	  min_pulse = 1000; // ticks for 1 ms
-	  max_pulse = 2000; // ticks for 2 ms
+	  min_pulse = 500; // ticks for 1 ms
+	  max_pulse = 2500; // ticks for 2 ms
 
 	  //-90 would be mapped to min_pulse 1000
 	  // +90 would be mapped to max pulse 2000
 	  //0 sits at the middle
-	  pulse = min_pulse + ((angle+ 90) / 180.0f ) * (max_pulse - min_pulse);
+	  pulse = (min_pulse + ((((angle))+ 90) / 180.0f ) * (max_pulse - min_pulse));
 	  ccr_value = (uint32_t)(pulse);
 
 	  printf("the pwm pulse is %lu \r\n", ccr_value);
