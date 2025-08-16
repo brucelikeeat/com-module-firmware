@@ -287,7 +287,12 @@ int main(void)
   	float vc[4] = {0};
   	int vc_index=0 ;
   	uint16_t individual_voltages[4] = {0};
+  	int temp_back = 1 ; //flag to break the infinite loop in case we are back on
+  	int voltage_back = 1; //flag to break the infinite loop in case we are back on
 
+
+
+  	float cell_voltage[4] = {0} ;
 
 
 
@@ -361,7 +366,37 @@ int main(void)
 		        if (adc >= temp_threshold ) {
 		            printf("%s temperature too high! %.2f°C CANT: %d CANT: %X \r\n", info.label, adc ,encoded_val , encoded_val);
 		            // toggle pin PC_8 it shuts off the entire system
-		           // HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); //PC_8 is the boot pin
+		           HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); //PC_8 is the boot pin
+		           temp_back = 0;
+
+		           while (temp_back == 0 ) {
+
+		        	   for (int y=20 ; y > 0 ; y-- ) {
+
+		        	  		printf("checking the temp in %d seconds" , y);
+		        	  		HAL_Delay(1000);
+
+		        	  		           	 }
+
+		        	   //read the pin again
+		        	  adc = ADC_Select_Channel(i);
+		        	  ADC_Channel_Info info = channel_info[i-1];
+		        	  adc_readings[i-1] = adc; //store the adc value
+
+		        	  if (adc <= temp_threshold ) {
+
+		        	  		temp_back = 1; //break the loop and continue if we are back on
+		        	  		printf("%s is below threshold \r\n", info.label);
+		        	  		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 power back on
+
+		        	  }
+
+		           }
+
+
+
+
+
 
 		        } else {
 		            printf("%s: %.2f°C CANT: %d \r\n", info.label, adc , encoded_val );
@@ -371,9 +406,41 @@ int main(void)
 		        if (adc*5 <= voltage_threshold ) {
 		            printf("%s below the recommended range! %.2f CANV: %d CANV: %X \r\n", info.label , 5*adc, encoded_val, encoded_val);
 		            // toggle pin PC_8 it shuts off the entire system
-		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); //PC_8 is the boot pin
+		            //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); //PC_8 is the boot pin
+		            /*
+		            voltage_back = 0;
 
-		        } else {
+		            // wait 20 seconds and enter an infinite loop of saying the batteries are under the
+		            //operating voltage and check if you are back on
+
+
+		            while (voltage_back == 0) {
+
+		            for (int k =20 ; k > 0 ; k--)
+		            {
+		            	printf("checking status of %s in %d seconds again\r\n",info.label, k );
+		            	HAL_Delay(1000); //wait
+
+		            }
+
+		            //read the pin again
+		             adc = ADC_Select_Channel(i);
+		            		  ADC_Channel_Info info = channel_info[i-1];
+		            		  adc_readings[i-1] = adc; //store the adc value
+
+		            	if (adc*5 >= voltage_threshold ) {
+
+		            		voltage_back = 1; //break the loop and continue if we are back on
+		            		printf("%s is back on\r\n", info.label);
+		            		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //PC_8 power back on
+		            	}
+
+		            }
+						*/
+
+		        }
+
+		        else {
 		            printf("%s: %.2fV CANV: %d CANV: %X\r\n", info.label, 5*adc ,encoded_val, encoded_val);
 		        }
 		    }
@@ -390,17 +457,106 @@ int main(void)
 		               }
 		               printf("\r\n");
 
+		               cell_voltage[1] = vc[0] - vc[3]; //cell 2
+		               cell_voltage[2] = vc[1] - vc[0]; //cell 3
+		               cell_voltage[3] = vc[2] - vc[1]; //cell 4
+		               cell_voltage[0] = vc[3]; //cell 1
+
+
 		               individual_voltages[0] = (vc[0] - vc[3]) * 1000;
 		               individual_voltages[1] = (vc[1] - vc[0]) * 1000;
 		               individual_voltages[2] = (vc[2] - vc[1]) * 1000;
 		               individual_voltages[3] = (vc[3]) * 1000;
 
+		               printf ("Cell1:%0.2f Cell2:%0.2f Cell3:%0.2f Cell4:%0.2f \r\n", cell_voltage[0] , cell_voltage[1] , cell_voltage[2] , cell_voltage[3] );
+
 		               for (int k = 0; k < 4; k++) {
-		                   printf("%d ", individual_voltages[k]);
-		               }
-		               printf("\r\n");
+
+		            	   if (cell_voltage[k] <= voltage_threshold ) {
+		   		            // toggle pin PC_8 it shuts off the entire system
+		            		printf("Cell %d voltage is below threshold %0.2f \r\n" , (k+1) , cell_voltage[k]);
+		   		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); //PC_8 is the boot pin
+		   		            voltage_back = 0;
+
+		   		            // wait 20 seconds and enter an infinite loop of saying the batteries are under the
+		   		            //operating voltage and check if you are back on
+
+		            	   }
+
+
+		            	   while(voltage_back == 0) {
+
+		            	       // Wait 20 seconds
+		            	       for (int o = 20; o > 0; o--) {
+		            	           printf("checking status of cell%d in %d seconds again\r\n", k+1 , o);
+		            	           HAL_Delay(1000);
+		            	       }
+
+		            	       vc_index = 0; // reset before refilling
+
+		            	       // Re-read all 4 voltage channels: i = 1, 3, 6, 7
+		            	       int voltage_channels[] = {1, 3, 6, 7};
+		            	       for (int ch = 0; ch < 4; ch++) {
+		            	           float refreshed_adc = ADC_Select_Channel(voltage_channels[ch]);
+		            	           vc[vc_index++] = refreshed_adc * 5;
+		            	       }
+
+		            	       // Recompute cell voltages
+		            	       cell_voltage[1] = vc[0] - vc[3]; //cell 2
+		            	       cell_voltage[2] = vc[1] - vc[0]; //cell 3
+		            	       cell_voltage[3] = vc[2] - vc[1]; //cell 4
+		            	       cell_voltage[0] = vc[3];         //cell 1
+
+		            	       // Update individual voltages
+		            	       individual_voltages[0] = (vc[0] - vc[3]) * 1000;
+		            	       individual_voltages[1] = (vc[1] - vc[0]) * 1000;
+		            	       individual_voltages[2] = (vc[2] - vc[1]) * 1000;
+		            	       individual_voltages[3] = vc[3] * 1000;
+
+		            	       // Re-check threshold for that specific cell
+		            	       if (cell_voltage[k] >= voltage_threshold) {
+		            	           voltage_back = 1;
+		            	           HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); //turn pin back on
+		            	           printf("Cell %d is back above threshold: %.2f\r\n", k+1, cell_voltage[k]);
+		            	       }
+
+
+
+
+
+
+
+		            	   }
+
+
+
+		            	   for (int z=0 ; z<4 ; z++) {
+
+
+		            		   printf("%f ", cell_voltage[z]);
+
+
+		            	   }
+
+		            	   printf("\r\n");
+
+
+
+
+		               } //for loop end
+
+
 		           }
-		       }
+	  }
+
+
+
+
+
+
+
+
+
 
 		       // Now build your TxData1 using temp_values and individual_voltages correctly
 
@@ -448,7 +604,7 @@ int main(void)
 	 printf("count: %d \r\n",count);
 
 
-  }
+  } //this is the end of the while loop
   /* USER CODE END 3 */
 }
 
