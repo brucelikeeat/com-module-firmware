@@ -21,7 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include <stdlib.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -109,6 +110,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  NMEA0183 * windsensor = NMEA0183__create(&huart2);
 
   /* USER CODE END 2 */
 
@@ -119,6 +121,35 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	HAL_Delay(10);
+	uint8_t itemsInBuffer = NMEA0183__itemsInBuffer(windsensor);
+	if (itemsInBuffer == 0)
+//		printf("No items in buffer.\r\n");
+		;
+	else {
+	  	for(uint8_t itemIndex = 0; itemIndex < itemsInBuffer; itemIndex++){
+	  		NMEA0183Raw * raw_msg = NMEA0183__getTopBufferItem(windsensor);
+
+	  		if (raw_msg == NULL){
+	  			NMEA0183__incrementReadIndex(windsensor);
+	  			continue;
+	  		}
+
+	  		if (NMEA0183__checkMessage(raw_msg) != GOOD_MESSAGE){
+	  			NMEA0183__incrementReadIndex(windsensor);
+	  			continue;
+	  		}
+
+	  		if (NMEA0183__getScentenceType(raw_msg) == MESSAGE_MWV){
+	  			uint16_t processedAngle = atof((char *)NMEA0183__getField(raw_msg, 1));
+	  			uint16_t processedSpeed = atof((char *)NMEA0183__getField(raw_msg, 3)) * 10.0;
+	  			printf("Wind Dir: %u Wind Speed: %u\r\n", processedAngle,processedSpeed);
+	  		}
+
+	  		NMEA0183__incrementReadIndex(windsensor);
+	  	}
+	}
+
   }
   /* USER CODE END 3 */
 }
@@ -320,7 +351,7 @@ static void MX_USART2_UART_Init(void)
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.Mode = UART_MODE_RX;
   huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart2.Init.OverSampling = UART_OVERSAMPLING_16;
   huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
@@ -369,7 +400,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0|LED_RED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
@@ -382,6 +413,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USER_BUTTON_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PG0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LED_RED_Pin */
   GPIO_InitStruct.Pin = LED_RED_Pin;
