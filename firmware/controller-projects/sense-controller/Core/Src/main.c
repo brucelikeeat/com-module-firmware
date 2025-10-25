@@ -37,17 +37,20 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define WIND_SENSOR_CAN_ID 0x041
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+
+FDCAN_HandleTypeDef hfdcan1;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef handle_GPDMA1_Channel15;
 
 /* USER CODE BEGIN PV */
-
+FDCAN_TxHeaderTypeDef TxHeader1;
+HAL_StatusTypeDef CanStartStatus;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -58,6 +61,7 @@ static void MX_GPDMA1_Init(void);
 static void MX_ICACHE_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_FDCAN1_Init(void);
 /* USER CODE BEGIN PFP */
 #ifdef __GNUC__
 /* With GCC/RAISONANCE, small printf (option LD Linker->Libraries->Small printf
@@ -66,6 +70,8 @@ static void MX_USART2_UART_Init(void);
 #else
 #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
 #endif /* __GNUC__ */
+
+static uint8_t byte_to_dlc(uint8_t len);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -109,8 +115,16 @@ int main(void)
   MX_ICACHE_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
+  MX_FDCAN1_Init();
   /* USER CODE BEGIN 2 */
   NMEA0183 * windsensor = NMEA0183__create(&huart2);
+  uint8_t output_wind_data[4];
+
+  CanStartStatus = HAL_FDCAN_Start(&hfdcan1);
+  if (CanStartStatus != HAL_OK)
+  {
+	  Error_Handler();
+  }
 
   /* USER CODE END 2 */
 
@@ -144,6 +158,25 @@ int main(void)
 	  			uint16_t processedAngle = atof((char *)NMEA0183__getField(raw_msg, 1));
 	  			uint16_t processedSpeed = atof((char *)NMEA0183__getField(raw_msg, 3)) * 10.0;
 	  			printf("Wind Dir: %u Wind Speed: %u\r\n", processedAngle,processedSpeed);
+
+	  			TxHeader1.Identifier         = WIND_SENSOR_CAN_ID;
+	  			TxHeader1.IdType             = (WIND_SENSOR_CAN_ID>0x7FF) ? FDCAN_EXTENDED_ID : FDCAN_STANDARD_ID;
+	  			TxHeader1.TxFrameType        = FDCAN_DATA_FRAME;
+	  			TxHeader1.DataLength         = byte_to_dlc(4);  /* HAL expects DLC in bits [19:16] */
+	  			TxHeader1.ErrorStateIndicator= FDCAN_ESI_ACTIVE;
+	  			TxHeader1.BitRateSwitch      = FDCAN_BRS_ON;
+	  			TxHeader1.FDFormat           = FDCAN_FD_CAN;
+	  			TxHeader1.TxEventFifoControl = FDCAN_STORE_TX_EVENTS;
+
+
+	  			output_wind_data[0] = (uint8_t) (processedAngle & 0xFF);
+	  			output_wind_data[1] = (uint8_t) ((processedAngle >> 8) & 0xFF);
+	  			output_wind_data[2] = (uint8_t) (processedSpeed & 0xFF);
+	  			output_wind_data[3] = (uint8_t) ((processedSpeed >> 8) & 0xFF);
+
+	  			if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1,&TxHeader1,output_wind_data)!=HAL_OK) {
+	  				 Error_Handler();
+	  			}
 	  		}
 
 	  		NMEA0183__incrementReadIndex(windsensor);
@@ -230,6 +263,49 @@ static void SystemPower_Config(void)
   }
 /* USER CODE BEGIN PWR */
 /* USER CODE END PWR */
+}
+
+/**
+  * @brief FDCAN1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_FDCAN1_Init(void)
+{
+
+  /* USER CODE BEGIN FDCAN1_Init 0 */
+
+  /* USER CODE END FDCAN1_Init 0 */
+
+  /* USER CODE BEGIN FDCAN1_Init 1 */
+
+  /* USER CODE END FDCAN1_Init 1 */
+  hfdcan1.Instance = FDCAN1;
+  hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV4;
+  hfdcan1.Init.FrameFormat = FDCAN_FRAME_FD_BRS;
+  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+  hfdcan1.Init.AutoRetransmission = ENABLE;
+  hfdcan1.Init.TransmitPause = DISABLE;
+  hfdcan1.Init.ProtocolException = DISABLE;
+  hfdcan1.Init.NominalPrescaler = 4;
+  hfdcan1.Init.NominalSyncJumpWidth = 3;
+  hfdcan1.Init.NominalTimeSeg1 = 16;
+  hfdcan1.Init.NominalTimeSeg2 = 3;
+  hfdcan1.Init.DataPrescaler = 1;
+  hfdcan1.Init.DataSyncJumpWidth = 16;
+  hfdcan1.Init.DataTimeSeg1 = 23;
+  hfdcan1.Init.DataTimeSeg2 = 16;
+  hfdcan1.Init.StdFiltersNbr = 1;
+  hfdcan1.Init.ExtFiltersNbr = 1;
+  hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
+  if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN FDCAN1_Init 2 */
+
+  /* USER CODE END FDCAN1_Init 2 */
+
 }
 
 /**
@@ -403,6 +479,7 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
@@ -464,6 +541,17 @@ PUTCHAR_PROTOTYPE
   HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 0xFFFF);
 
   return ch;
+}
+
+static uint8_t byte_to_dlc(uint8_t len) {
+	if (len <= 8) return len;
+    else if (len == 12) return 9;
+    else if (len == 16) return 10;
+    else if (len == 20) return 11;
+    else if (len == 24) return 12;
+    else if (len == 32) return 13;
+    else if (len == 48) return 14;
+    else return 15;
 }
 /* USER CODE END 4 */
 
