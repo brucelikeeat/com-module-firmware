@@ -80,7 +80,7 @@ static void MX_FDCAN1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 NMEA0183 *ecompass;
-const char PASHR_ENABLE_CMD[] = "$JASC,PASHR,1\x0D\x0A"; //enables PASHR sentence type
+const char PASHR_ENABLE_CMD[] = "$JASC,PASHR,10\x0D\x0A"; //enables PASHR sentence type
 const char GPHDT_FREQ[] = "$JASC,GPHDT,1\x0D\x0A"; //allows heading data received at 10Hz
 /* USER CODE END 0 */
 
@@ -123,6 +123,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_FDCAN1_Init();
   /* USER CODE BEGIN 2 */
+
   ecompass = NMEA0183__create(&huart2);
 
   //signal sent to initialize PASHR sentence type
@@ -138,7 +139,6 @@ int main(void)
   //initializations for CAN
   CAN_Init(&hfdcan1);
   CAN_SetRxBufferSize(64, 64);
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -171,9 +171,9 @@ int main(void)
 
 			  uint32_t euler[] = {heading, pitch, roll};
 			  //Transmission message from receiver board to main board
-			  if (CAN_Transmit(0x123, FDCAN_STANDARD_ID, FDCAN_DLC_BYTES_12, (uint8_t *) euler, &hfdcan1) != HAL_OK) {
-				  Error_Handler();
-			  }
+//			  if (CAN_Transmit(0x123, FDCAN_STANDARD_ID, FDCAN_DLC_BYTES_12, (uint8_t *) euler, &hfdcan1) != HAL_OK) {
+//				  Error_Handler();
+//			  }
 
 		  }
 		  else if(NMEA0183__getScentenceType(data) == MESSAGE_HDT){
@@ -184,9 +184,9 @@ int main(void)
 
 			  uint32_t euler[] = {heading};
 			  //Transmission message from receiver board to main board
-			  if (CAN_Transmit(0x123, FDCAN_STANDARD_ID, FDCAN_DLC_BYTES_4, (uint8_t *) euler, &hfdcan1) != HAL_OK) {
-				  Error_Handler();
-			  }
+//			  if (CAN_Transmit(0x123, FDCAN_STANDARD_ID, FDCAN_DLC_BYTES_4, (uint8_t *) euler, &hfdcan1) != HAL_OK) {
+//				  Error_Handler();
+//			  }
 		  }
 
 		  printf("\x0D\x0A");
@@ -619,8 +619,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
